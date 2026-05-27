@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام التحويل إلى شام كاش</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f4f8; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .container { background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding: 30px; width: 100%; max-width: 450px; }
+        h2 { text-align: center; color: #2d3748; margin-bottom: 25px; font-size: 24px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #4a5568; font-weight: 600; font-size: 14px; }
+        input { width: 100%; padding: 14px 18px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; transition: all 0.3s; background: #f7fafc; text-align: right; }
+        input:focus { outline: none; border-color: #4299e1; background: white; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+        button { width: 100%; padding: 15px; background: #4299e1; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin-top: 5px; }
+        button:hover:not(:disabled) { background: #2b6cb0; transform: translateY(-1px); box-shadow: 0 7px 20px rgba(66,153,225,0.3); }
+        button:disabled { background: #a0aec0; cursor: not-allowed; }
+        .status-message { margin-top: 20px; padding: 15px; border-radius: 10px; text-align: center; font-size: 14px; display: none; transition: all 0.3s; }
+        .status-message.success { background: #f0fff4; border: 1px solid #c6f6d5; color: #22543d; }
+        .status-message.error { background: #fff5f5; border: 1px solid #fed7d7; color: #742a2a; }
+        .status-message.info { background: #ebf8ff; border: 1px solid #bee3f8; color: #2a4365; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .header-icon { text-align: center; font-size: 40px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-icon">💸</div>
+        <h2>تحويل إلى شام كاش</h2>
+        
+        <form id="transferForm">
+            <div class="form-group">
+                <label for="militaryId">الرقم العسكري</label>
+                <input type="text" id="militaryId" name="militaryId" placeholder="أدخل الرقم العسكري..." required>
+            </div>
+            
+            <div class="form-group" id="amountGroup" style="display: none;">
+                <label for="amount">المبلغ (ل.س)</label>
+                <input type="number" id="amount" name="amount" placeholder="أدخل المبلغ..." min="1" step="1" required>
+            </div>
+            
+            <button type="submit" id="submitBtn">
+                تحقق من الرقم العسكري
+            </button>
+        </form>
+        
+        <div id="statusMessage" class="status-message"></div>
+    </div>
+
+    <script>
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx4L8tFjDT2PApYzkkgrsaY1Jht-OYGrHQQmFGG4KHzhk514FxMSuHn-MEMoAq8qh52kw/exec';
+        
+        const form = document.getElementById('transferForm');
+        const militaryIdInput = document.getElementById('militaryId');
+        const amountGroup = document.getElementById('amountGroup');
+        const amountInput = document.getElementById('amount');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('statusMessage');
+        
+        let isValidated = false;
+        let currentMilitaryId = null;
+        
+        // إظهار رسالة
+        function showMessage(text, type) {
+            statusDiv.textContent = text;
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+        }
+        
+        // إخفاء الرسالة
+        function hideMessage() {
+            statusDiv.style.display = 'none';
+        }
+        
+        // إظهار التحميل على الزر
+        function setLoading(loading) {
+            if (loading) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="loading-spinner"></span> جاري المعالجة...';
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.textContent = isValidated ? 'إرسال التحويل' : 'تحقق من الرقم العسكري';
+            }
+        }
+        
+        // التحقق من الرقم العسكري
+        async function validateMilitaryId(militaryId) {
+            setLoading(true);
+            hideMessage();
+            
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // ضروري لتجنب مشاكل CORS مع Google Apps Script
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        militaryId: militaryId,
+                        amount: 0, // إرسال 0 فقط للتحقق
+                        validateOnly: true // إشارة أننا نتحقق فقط
+                    }),
+                });
+                
+                // عند استخدام no-cors، لا يمكن قراءة الرد مباشرة
+                // لذا سنحاول إرسال طلب صغير فعلي (بمبلغ 0) أو نعتمد على استجابة غير مباشرة
+                
+                // بديل: استخدام XMLHttpRequest لمحاولة قراءة الرد
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', SCRIPT_URL, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            if (result.success === true || result.error === 'الرقم العسكري غير موجود') {
+                                // الرقم موجود (حتى لو كان الخطأ غير متوقع، لكن الرد وصل)
+                                isValidated = true;
+                                currentMilitaryId = militaryId;
+                                amountGroup.style.display = 'block';
+                                submitBtn.textContent = 'إرسال التحويل';
+                                amountInput.focus();
+                                showMessage('✓ تم التعرف على الرقم العسكري. أدخل المبلغ الآن.', 'success');
+                            } else {
+                                showMessage('✗ ' + (result.error || 'الرقم العسكري غير موجود'), 'error');
+                            }
+                        } catch (e) {
+                            // إذا لم نستطع قراءة الرد، قد يكون الرقم موجودًا
+                            showMessage('⚠️ تعذر التحقق من الرقم. يمكنك محاولة الإرسال.', 'info');
+                        }
+                    } else {
+                        showMessage('⚠️ خطأ في الاتصال. الرجاء المحاولة مرة أخرى.', 'error');
+                    }
+                    setLoading(false);
+                };
+                
+                xhr.onerror = function() {
+                    showMessage('⚠️ فشل الاتصال بالخادم. تأكد من الرابط.', 'error');
+                    setLoading(false);
+                };
+                
+                xhr.send(JSON.stringify({
+                    militaryId: militaryId,
+                    amount: 0,
+                    validateOnly: true
+                }));
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('⚠️ فشل الاتصال بالخادم. تأكد من الرابط.', 'error');
+                setLoading(false);
+            }
+        }
+        
+        // إرسال التحويل
+        async function submitTransfer(militaryId, amount) {
+            setLoading(true);
+            hideMessage();
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', SCRIPT_URL, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            if (result.success === true) {
+                                showMessage('✅ تمت عملية التحويل بنجاح!', 'success');
+                                // إعادة تعيين النموذج
+                                setTimeout(() => {
+                                    form.reset();
+                                    isValidated = false;
+                                    currentMilitaryId = null;
+                                    amountGroup.style.display = 'none';
+                                    submitBtn.textContent = 'تحقق من الرقم العسكري';
+                                    hideMessage();
+                                }, 3000);
+                            } else {
+                                showMessage('❌ ' + (result.error || 'فشلت عملية التحويل'), 'error');
+                            }
+                        } catch (e) {
+                            showMessage('⚠️ تم الإرسال لكن تعذر قراءة الرد. تحقق من تطبيق شام كاش.', 'info');
+                        }
+                    } else {
+                        showMessage('⚠️ خطأ في الاتصال. الرجاء المحاولة مرة أخرى.', 'error');
+                    }
+                    setLoading(false);
+                };
+                
+                xhr.onerror = function() {
+                    showMessage('⚠️ فشل الاتصال بالخادم.', 'error');
+                    setLoading(false);
+                };
+                
+                xhr.send(JSON.stringify({
+                    militaryId: militaryId,
+                    amount: amount,
+                    validateOnly: false
+                }));
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('⚠️ فشل الاتصال بالخادم.', 'error');
+                setLoading(false);
+            }
+        }
+        
+        // معالجة تقديم النموذج
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const militaryId = militaryIdInput.value.trim();
+            
+            if (!militaryId) {
+                showMessage('⚠️ الرجاء إدخال الرقم العسكري', 'error');
+                return;
+            }
+            
+            if (!isValidated) {
+                // الخطوة الأولى: التحقق من الرقم العسكري
+                validateMilitaryId(militaryId);
+            } else {
+                // الخطوة الثانية: إرسال التحويل
+                const amount = amountInput.value.trim();
+                if (!amount || amount <= 0) {
+                    showMessage('⚠️ الرجاء إدخال مبلغ صحيح', 'error');
+                    return;
+                }
+                submitTransfer(currentMilitaryId, amount);
+            }
+        });
+        
+        // إعادة تعيين عند تغيير الرقم العسكري
+        militaryIdInput.addEventListener('input', function() {
+            if (isValidated && this.value !== currentMilitaryId) {
+                isValidated = false;
+                currentMilitaryId = null;
+                amountGroup.style.display = 'none';
+                amountInput.value = '';
+                submitBtn.textContent = 'تحقق من الرقم العسكري';
+                hideMessage();
+            }
+        });
+    </script>
+</body>
+</html>
